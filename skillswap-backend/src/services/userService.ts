@@ -1,0 +1,178 @@
+import { UserModel } from '../models/user';
+import { CacheService } from '../config/redis';
+import { redis } from '../config/redis';
+import { logger } from '../utils/logger';
+import { User, CreateUserRequest, UpdateProfileRequest } from '../types';
+
+export class UserService {
+  // Create user with additional business logic
+  static async createUser(userData: CreateUserRequest & { uid: string }): Promise<User> {
+    try {
+      // Validate and clean data
+      const cleanedData = {
+        ...userData,
+        name: userData.name.trim(),
+        email: userData.email.toLowerCase(),
+        skills_offered: userData.skills_offered?.map(skill => skill.trim()) || [],
+        skills_wanted: userData.skills_wanted?.map(skill => skill.trim()) || []
+      };
+
+      // Create user
+      const user = await UserModel.create(cleanedData);
+
+      // Update skill popularity
+      if (cleanedData.skills_offered.length > 0) {
+        for (const skill of cleanedData.skills_offered) {
+          await CacheService.incrementSkillPopularity(skill);
+        }
+      }
+
+      logger.info(`✅ User service: Created user ${user.uid}`);
+      return user;
+    } catch (error) {
+      logger.error('❌ User service: Failed to create user:', error);
+      throw error;
+    }
+  }
+
+  // Get user with caching
+  static async getUser(uid: string, useCache: boolean = true): Promise<User | null> {
+    try {
+      if (useCache) {
+        // Try cache first
+        const cached = await CacheService.getUserProfile(uid);
+        if (cached) {
+          return cached;
+        }
+      }
+
+      // Get from Firestore
+      const user = await UserModel.findByUid(uid);
+      if (user && useCache) {
+        // Cache for future requests
+        await CacheService.setUserProfile(uid, user);
+      }
+
+      return user;
+    } catch (error) {
+      logger.error(`❌ User service: Failed to get user ${uid}:`, error);
+      throw error;
+    }
+  }
+
+  // Update user with cache invalidation
+  static async updateUser(uid: string, updateData: UpdateProfileRequest): Promise<User> {
+    try {
+      // Clean the data
+      const cleanedData: UpdateProfileRequest = {};
+      if (updateData.name) {
+        cleanedData.name = updateData.name.trim();
+      }
+      if (updateData.skills_offered) {
+        cleanedData.skills_offered = updateData.skills_offered.map(skill => skill.trim());
+      }
+      if (updateData.skills_wanted) {
+        cleanedData.skills_wanted = updateData.skills_wanted.map(skill => skill.trim());
+      }
+      if (updateData.availability) {
+        cleanedData.availability = updateData.availability;
+      }
+      if (updateData.avatar_url) {
+        cleanedData.avatar_url = updateData.avatar_url;
+      }
+
+      // Update user
+      const updatedUser = await UserModel.update(uid, cleanedData);
+
+      // Update cache
+      await CacheService.setUserProfile(uid, updatedUser);
+
+      // Update skill popularity if skills changed
+      if (cleanedData.skills_offered) {
+        for (const skill of cleanedData.skills_offered) {
+          await CacheService.incrementSkillPopularity(skill);
+        }
+      }
+
+      // Clear matches cache since profile changed
+      await redis.del(`matches:${uid}`);
+
+      logger.info(`✅ User service: Updated user ${uid}`);
+      return updatedUser;
+    } catch (error) {
+      logger.error(`❌ User service: Failed to update user ${uid}:`, error);
+      throw error;
+    }
+  }
+
+  // Get users for matching with business logic
+  static async getUsersForMatching(excludeUid: string, limit: number = 50): Promise<User[]> {
+    try {
+      const users = await UserModel.getAllForMatching(excludeUid, limit);
+      
+      // Filter out users with incomplete profiles
+      const completeUsers = users.filter(user => 
+        user.skills_offered.length > 0 || user.skills_wanted.length > 0
+      );
+
+      logger.info(`✅ User service: Retrieved ${completeUsers.length} users for matching`);
+      return completeUsers;
+    } catch (error) {
+      logger.error('❌ User service: Failed to get users for matching:', error);
+      throw error;
+    }
+  }
+
+  // Validate user can perform action
+  static async validateUserAction(uid: string, action: string): Promise<boolean> {
+    try {
+      const user = await this.getUser(uid);
+      if (!user) {
+        return false;
+      }
+
+      // Add business logic for different actions
+      switch (action) {
+        case 'match':
+          return user.skills_offered.length > 0 || user.skills_wanted.length > 0;
+        case 'mentor':
+          return user.role === 'mentor' && user.skills_offered.length > 0;
+        default:
+          return true;
+      }
+    } catch (error) {
+      logger.error(`❌ User service: Failed to validate action ${action} for ${uid}:`, error);
+      return false;
+    }
+  }
+
+  // Award badges to user
+  static async awardBadge(uid: string, badgeType: string, increment: number = 1): Promise<void> {
+    try {
+      await UserModel.updateBadgeCount(uid, increment);
+      
+      // Update cache
+      const user = await UserModel.findByUid(uid);
+      if (user) {
+        await CacheService.setUserProfile(uid, user);
+      }
+
+      logger.info(`🏆 User service: Awarded ${badgeType} badge to ${uid} (+${increment})`);
+    } catch (error) {
+      logger.error(`❌ User service: Failed to award badge to ${uid}:`, error);
+      throw error;
+    }
+  }
+
+  // Delete user
+  static async deleteUser(uid: string): Promise<void> {
+    try {
+      await UserModel.delete(uid);
+      await CacheService.clearUserCache(uid);
+      logger.info(`✅ User service: Deleted user ${uid}`);
+    } catch (error) {
+      logger.error(`❌ User service: Failed to delete user ${uid}:`, error);
+      throw error;
+    }
+  }
+}
