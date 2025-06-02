@@ -6,7 +6,9 @@
     "test": "tests"
   },
   "scripts": {
-    "type": "module"
+    "dev": "nodemon src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",
