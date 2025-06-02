@@ -55,7 +55,7 @@ router.post('/badges',
  * @desc    Delete user profile (own profile or admin)
  * @access  Private
  */
-router.delete('/:uid?',
+router.delete('/:uid',
   authenticateToken,
   ProfileController.deleteProfile
 );

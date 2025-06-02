@@ -76,3 +76,22 @@ export interface MatchParams extends PaginationParams {
   skill_filter?: string;
   availability_filter?: string[];
 }
+
+export interface MatchExplanation {
+  match_score: number;
+  mutual_skills: boolean;
+  skills_a_wants_from_b: string[];
+  skills_b_wants_from_a: string[];
+  availability_overlap: number;
+  role_compatibility: boolean;
+}
+
+export interface MatchStats {
+  total_matches: number;
+  high_score_matches: number;
+  medium_score_matches: number;
+  low_score_matches: number;
+  average_match_score: number;
+  top_skills_in_demand: { skill: string; count: number }[];
+  top_skills_offered: { skill: string; count: number }[];
+}
