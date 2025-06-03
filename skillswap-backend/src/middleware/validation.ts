@@ -24,16 +24,22 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
 };
 
 // User registration validation
+// User registration validation
 export const validateRegistration = [
+  body('idToken')
+    .notEmpty()
+    .withMessage('Firebase ID token is required'),
+    
   body('name')
     .isLength({ min: 2, max: 100 })
     .withMessage('Name must be between 2 and 100 characters')
     .trim(),
   
-  body('email')
-    .isEmail()
-    .withMessage('Valid email is required')
-    .normalizeEmail(),
+  // ❌ REMOVE THIS - Email comes from Firebase token
+  // body('email')
+  //   .isEmail()
+  //   .withMessage('Valid email is required')
+  //   .normalizeEmail(),
   
   body('role')
     .optional()
@@ -45,8 +51,19 @@ export const validateRegistration = [
     .isURL()
     .withMessage('Avatar URL must be a valid URL'),
   
+  body('skills_offered')
+    .optional()
+    .isArray()
+    .withMessage('Skills offered must be an array'),
+    
+  body('skills_wanted')
+    .optional()
+    .isArray()
+    .withMessage('Skills wanted must be an array'),
+  
   handleValidationErrors
 ];
+
 
 // Profile update validation
 export const validateProfileUpdate = [
