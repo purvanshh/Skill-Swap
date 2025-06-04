@@ -50,7 +50,7 @@ const Dashboard = () => {
             </button>
           </div>
           <p className="mt-6 text-sm text-gray-500">
-            👤 Join 10,000+ users already swapping skills
+            👤 Join 10+ users already swapping skills
           </p>
         </div>
 
