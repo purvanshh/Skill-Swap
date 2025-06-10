@@ -45,6 +45,20 @@ export function Header() {
           <span className="font-bold text-xl">SkillSwap</span>
         </Link>
         
+        {/* Mobile menu button */}
+        <button
+          className="md:hidden p-2 hover:bg-accent rounded-md"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          {isMobileMenuOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </button>
+        
+        {/* Desktop navigation */}
         <div className="hidden md:flex items-center gap-6">
           <nav className="flex gap-6">
             <Link href="/how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">
@@ -68,56 +82,52 @@ export function Header() {
             </Link>
           </div>
         </div>
-        
-        <button 
-          className="md:hidden" 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        >
-          {isMobileMenuOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <Menu className="h-6 w-6" />
-          )}
-        </button>
       </div>
-      
+
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-background pt-16">
-          <nav className="flex flex-col items-center gap-6 p-6">
-            <Link 
-              href="/how-it-works" 
-              className="text-xl font-medium py-3"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              How It Works
-            </Link>
-            <Link 
-              href="/skills" 
-              className="text-xl font-medium py-3"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Browse Skills
-            </Link>
-            <Link 
-              href="/pricing" 
-              className="text-xl font-medium py-3"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Pricing
-            </Link>
-            <div className="flex flex-col w-full gap-4 mt-4">
-              <Link href="/signin" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full">Sign In</Button>
+        <div className="md:hidden border-t">
+          <div className="container py-4 space-y-4">
+            <nav className="flex flex-col gap-4">
+              <Link 
+                href="/how-it-works" 
+                className="text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                How It Works
               </Link>
-              <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button className="w-full">Sign Up</Button>
+              <Link 
+                href="/skills" 
+                className="text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Browse Skills
               </Link>
-              <div className="flex justify-center mt-4">
+              <Link 
+                href="/pricing" 
+                className="text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Pricing
+              </Link>
+            </nav>
+            <div className="flex flex-col gap-2 pt-4 border-t">
+              <div className="flex items-center justify-between px-2">
+                <span className="text-sm text-muted-foreground">Theme</span>
                 <ModeToggle />
               </div>
+              <Link href="/signin" className="w-full">
+                <Button variant="ghost" className="w-full justify-start">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/signup" className="w-full">
+                <Button className="w-full justify-start">
+                  Sign Up
+                </Button>
+              </Link>
             </div>
-          </nav>
+          </div>
         </div>
       )}
     </header>

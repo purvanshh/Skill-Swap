@@ -2,18 +2,18 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function Testimonials() {
   return (
-    <section className="py-20 bg-muted/30">
-      <div className="container">
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight mb-4">
+    <section className="py-12 sm:py-16 md:py-20 bg-muted/30">
+      <div className="container px-4 sm:px-6">
+        <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12 md:mb-16">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-3 sm:mb-4">
             What Our Community Says
           </h2>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-base sm:text-lg text-muted-foreground">
             Thousands of students are already exchanging skills and growing together.
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           <TestimonialCard
             quote="I learned Photoshop basics in just three 30-minute sessions, and in return, I taught Excel formulas. It was so much more engaging than watching tutorials!"
             author="Alice Chen"
@@ -42,22 +42,25 @@ export function Testimonials() {
 
 function TestimonialCard({ quote, author, role, avatar }) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="h-full transition-all duration-200 hover:shadow-md">
       <CardContent className="p-6">
-        <div className="mb-4">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M17.5 25H7.5L15 10H10L2.5 25V35H17.5V25Z" fill="currentColor" fillOpacity="0.2" />
-            <path d="M37.5 25H27.5L35 10H30L22.5 25V35H37.5V25Z" fill="currentColor" fillOpacity="0.2" />
-          </svg>
-        </div>
-        <p className="mb-6 text-lg">{quote}</p>
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full overflow-hidden">
-            <img src={avatar} alt={author} className="h-full w-full object-cover" />
-          </div>
-          <div>
-            <p className="font-medium">{author}</p>
-            <p className="text-sm text-muted-foreground">{role}</p>
+        <div className="flex flex-col h-full">
+          <blockquote className="flex-1">
+            <p className="text-base sm:text-lg text-muted-foreground mb-6">
+              "{quote}"
+            </p>
+          </blockquote>
+          <div className="flex items-center gap-4">
+            <img
+              src={avatar}
+              alt={author}
+              className="w-12 h-12 rounded-full object-cover"
+              loading="lazy"
+            />
+            <div>
+              <p className="font-medium">{author}</p>
+              <p className="text-sm text-muted-foreground">{role}</p>
+            </div>
           </div>
         </div>
       </CardContent>

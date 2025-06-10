@@ -3,31 +3,31 @@ import { Button } from './ui/button';
 
 export function HeroSection() {
   return (
-    <section className="py-20 md:py-28 overflow-hidden relative">
+    <section className="py-12 sm:py-16 md:py-20 lg:py-28 overflow-hidden relative">
       {/* Background gradient */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-x-0 top-0 h-96 bg-gradient-to-b from-primary/10 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-64 sm:h-80 md:h-96 bg-gradient-to-b from-primary/10 to-transparent" />
       </div>
       
-      <div className="container">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6 max-w-xl">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+      <div className="container px-4 sm:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          <div className="space-y-4 sm:space-y-6 max-w-xl">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
               Share what you know,<br />
               <span className="text-primary">Learn what you don't</span>
             </h1>
-            <p className="text-xl text-muted-foreground">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground">
               Exchange micro-learning sessions with peers. Teach your expertise, learn new skills, 
               no money needed — just your time and knowledge.
             </p>
-            <div className="flex flex-wrap gap-4 pt-4">
-              <Link href="/signup">
-                <Button size="lg" className="h-12 px-6 font-medium">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <Link href="/signup" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto h-12 px-6 font-medium">
                   Start Swapping
                 </Button>
               </Link>
-              <Link href="/how-it-works">
-                <Button variant="outline" size="lg" className="h-12 px-6 font-medium">
+              <Link href="/how-it-works" className="w-full sm:w-auto">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto h-12 px-6 font-medium">
                   How It Works
                 </Button>
               </Link>
@@ -40,19 +40,20 @@ export function HeroSection() {
             </div>
           </div>
           
-          <div className="relative">
+          <div className="relative mt-8 lg:mt-0">
             <div className="bg-gradient-to-tr from-primary/80 to-primary p-1 rounded-2xl rotate-1 shadow-xl">
-              <div className="bg-card rounded-xl overflow-hidden">
+              <div className="bg-card rounded-xl overflow-hidden aspect-[4/3] sm:aspect-[16/9]">
                 <img 
                   src="https://images.pexels.com/photos/7516363/pexels-photo-7516363.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" 
                   alt="Students collaborating" 
-                  className="w-full h-auto"
+                  className="w-full h-full object-cover"
+                  loading="eager"
                 />
               </div>
             </div>
             
             {/* Floating skill cards */}
-            <div className="absolute -bottom-6 -left-6 bg-card p-4 rounded-lg shadow-lg border animate-bounce-slow">
+            <div className="absolute -bottom-4 sm:-bottom-6 -left-4 sm:-left-6 bg-card p-3 sm:p-4 rounded-lg shadow-lg border animate-bounce-slow hidden sm:block">
               <div className="flex items-center gap-2">
                 <div className="bg-primary/10 text-primary p-2 rounded-full">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-video">
@@ -67,7 +68,7 @@ export function HeroSection() {
               </div>
             </div>
             
-            <div className="absolute -top-4 -right-4 bg-card p-4 rounded-lg shadow-lg border animate-bounce-slow delay-500">
+            <div className="absolute -top-4 sm:-top-6 -right-4 sm:-right-6 bg-card p-3 sm:p-4 rounded-lg shadow-lg border animate-bounce-slow hidden sm:block">
               <div className="flex items-center gap-2">
                 <div className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 p-2 rounded-full">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-table-2">
@@ -80,7 +81,6 @@ export function HeroSection() {
                 </div>
               </div>
             </div>
-            
           </div>
         </div>
       </div>
