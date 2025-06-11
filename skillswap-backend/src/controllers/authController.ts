@@ -1,7 +1,8 @@
+// controllers/authController.ts - UPDATED TO WORK WITH MIDDLEWARE
 import { Request, Response, NextFunction } from 'express';
-import { verifyFirebaseToken, firestore } from '../config/firebase';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
+import { UserService } from '../services/userService';
 import { CreateUserRequest } from '../types';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -9,8 +10,10 @@ export class AuthController {
   // Register new user with Firebase
   static async register(req: Request, res: Response, next: NextFunction) {
     try {
+      // User info already extracted and verified by authenticateToken middleware
+      const { uid, email } = req.user!;
+      
       const { 
-        idToken, 
         name, 
         role = 'student', 
         avatar_url, 
@@ -19,71 +22,35 @@ export class AuthController {
         availability = { days: [], times: [] } 
       } = req.body;
 
-      if (!idToken) {
-        throw new AppError('Firebase ID token is required', 400);
-      }
-
       if (!name) {
         throw new AppError('Name is required', 400);
       }
 
-      // Verify Firebase ID token
-      const decodedToken = await verifyFirebaseToken(idToken);
-      const { uid, email } = decodedToken;
-
-      // Check if user already exists in Firestore
-      const userDoc = await firestore.collection('users').doc(uid).get();
-      if (userDoc.exists) {
-        throw new AppError('User already exists', 409);
-      }
-
-      // Create user data
-      const userData = {
+      // Use service layer for user creation
+      const user = await UserService.createUser({
         uid,
         name: name.trim(),
-        email: email!,
+        email,
         avatar_url: avatar_url || null,
         role,
         skills_offered,
         skills_wanted,
-        availability,
-        badge_count: 0,
-        created_at: FieldValue.serverTimestamp(),
-        updated_at: FieldValue.serverTimestamp()
-      };
-
-      // Create user document in Firestore
-      await firestore.collection('users').doc(uid).set(userData);
-
-      // Update skill popularity counters
-      if (skills_offered.length > 0) {
-        const batch = firestore.batch();
-        
-        for (const skill of skills_offered) {
-          const skillRef = firestore.collection('skill_popularity').doc(skill.toLowerCase());
-          batch.set(skillRef, {
-            name: skill,
-            count: FieldValue.increment(1),
-            updated_at: FieldValue.serverTimestamp()
-          }, { merge: true });
-        }
-        
-        await batch.commit();
-      }
+        availability
+      });
 
       logger.info(`✅ User registered successfully: ${uid}`);
 
       // Return user data (excluding sensitive info)
       const responseData = {
-        uid: userData.uid,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-        avatar_url: userData.avatar_url,
-        skills_offered: userData.skills_offered,
-        skills_wanted: userData.skills_wanted,
-        availability: userData.availability,
-        badge_count: userData.badge_count
+        uid: user.uid,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar_url: user.avatar_url,
+        skills_offered: user.skills_offered,
+        skills_wanted: user.skills_wanted,
+        availability: user.availability,
+        badge_count: user.badge_count
       };
 
       res.status(201).json({
@@ -99,90 +66,72 @@ export class AuthController {
   }
 
   // Login user (verify token and return user info)
-  static async login(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { idToken } = req.body;
+static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // User info already extracted and verified by authenticateToken middleware
+    const { uid, email } = req.user!;
 
-      if (!idToken) {
-        throw new AppError('Firebase ID token is required', 400);
-      }
+    // Get user from service layer
+    const user = await UserService.getUser(uid);
 
-      // Verify Firebase ID token
-      const decodedToken = await verifyFirebaseToken(idToken);
-      const { uid, email } = decodedToken;
-
-      // Get user from Firestore
-      const userDoc = await firestore.collection('users').doc(uid).get();
-      
-      if (!userDoc.exists) {
-        // For Google OAuth users who haven't completed registration
-        if (decodedToken.firebase.sign_in_provider === 'google.com') {
-          return res.status(200).json({
-            success: true,
-            message: 'Google user needs to complete registration',
-            data: {
-              needsRegistration: true,
-              email,
-              uid
-            }
-          });
-        }
-        
-        throw new AppError('User not found. Please register first.', 404);
-      }
-
-      const userData = userDoc.data()!;
-
-      logger.info(`✅ User logged in successfully: ${uid}`);
-
+    if (!user) {
+      // For OAuth users who haven't completed registration
       res.status(200).json({
         success: true,
-        message: 'Login successful',
+        message: 'User needs to complete registration',
         data: {
-          user: {
-            uid: userData.uid,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            avatar_url: userData.avatar_url,
-            badge_count: userData.badge_count
-          }
+          needsRegistration: true,
+          email,
+          uid
         }
       });
-    } catch (error) {
-      next(error);
+      return; // exit early
     }
+
+    logger.info(`✅ User logged in successfully: ${uid}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          uid: user.uid,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar_url: user.avatar_url,
+          badge_count: user.badge_count
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
   }
+}
+
 
   // Verify token endpoint (for frontend auth checks)
   static async verifyToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const { idToken } = req.body;
+      // User info already extracted and verified by authenticateToken middleware
+      const { uid } = req.user!;
+      
+      const user = await UserService.getUser(uid);
 
-      if (!idToken) {
-        throw new AppError('Firebase ID token is required', 400);
-      }
-
-      // Verify Firebase ID token
-      const decodedToken = await verifyFirebaseToken(idToken);
-      const userDoc = await firestore.collection('users').doc(decodedToken.uid).get();
-
-      if (!userDoc.exists) {
+      if (!user) {
         throw new AppError('User not found', 404);
       }
-
-      const userData = userDoc.data()!;
 
       res.status(200).json({
         success: true,
         message: 'Token is valid',
         data: {
           user: {
-            uid: userData.uid,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            badge_count: userData.badge_count
+            uid: user.uid,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            badge_count: user.badge_count
           }
         }
       });
