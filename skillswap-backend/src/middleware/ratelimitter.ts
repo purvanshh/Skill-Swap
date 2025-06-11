@@ -58,21 +58,23 @@ export const createRateLimiter = (options: {
   };
 };
 
+//Rate Limit to be adjusted after development
+
 // Specific rate limiters for different endpoints
 export const authRateLimit = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5, // 5 attempts per 15 minutes
+  maxRequests: 200, // 200 attempts per 15 minutes
   keyGenerator: (req) => `auth:${req.ip}:${req.body.email || 'unknown'}`
 });
 
 export const profileRateLimit = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
-  maxRequests: 10, // 10 requests per minute
+  maxRequests: 100, // 100 requests per minute
   keyGenerator: (req) => `profile:${req.user?.uid || req.ip}`
 });
 
 export const matchRateLimit = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
-  maxRequests: 5, // 5 match requests per minute
+  maxRequests: 200, // 200 match requests per minute
   keyGenerator: (req) => `match:${req.user?.uid || req.ip}`
 });
