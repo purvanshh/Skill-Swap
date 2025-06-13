@@ -23,23 +23,17 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
   next();
 };
 
-// User registration validation
-// User registration validation
+// User registration validation - FIXED
 export const validateRegistration = [
-  body('idToken')
-    .notEmpty()
-    .withMessage('Firebase ID token is required'),
+  // ❌ REMOVED - Token is handled by middleware now
+  // body('idToken')
+  //   .notEmpty()
+  //   .withMessage('Firebase ID token is required'),
     
   body('name')
     .isLength({ min: 2, max: 100 })
     .withMessage('Name must be between 2 and 100 characters')
     .trim(),
-  
-  // ❌ REMOVE THIS - Email comes from Firebase token
-  // body('email')
-  //   .isEmail()
-  //   .withMessage('Valid email is required')
-  //   .normalizeEmail(),
   
   body('role')
     .optional()
@@ -63,7 +57,6 @@ export const validateRegistration = [
   
   handleValidationErrors
 ];
-
 
 // Profile update validation
 export const validateProfileUpdate = [
