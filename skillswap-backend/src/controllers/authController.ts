@@ -46,8 +46,12 @@ export class AuthController {
         role,
         skills_offered,
         skills_wanted,
-        availability,
+        availability: availability || {
+          days: [],
+          times: []
+        },
         badge_count: 0,
+        available_slots: [], // Default empty array for calendar slots
         created_at: FieldValue.serverTimestamp(),
         updated_at: FieldValue.serverTimestamp()
       };
