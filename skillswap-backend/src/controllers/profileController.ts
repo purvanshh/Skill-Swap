@@ -4,6 +4,9 @@ import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 import { UpdateProfileRequest } from '../types';
 import { FieldValue } from 'firebase-admin/firestore';
+import { CalendarService } from '../services/calendarService';
+import { SessionRatingService } from '../services/sessionRatingService';
+import { SessionBookingService } from '../services/sessionBookingService';
 
 export class ProfileController {
   // Get current user's profile
@@ -315,4 +318,270 @@ export class ProfileController {
       next(error);
     }
   }
+
+ static async storeCalendarToken(req: Request, res: Response, next: NextFunction) {
+  try {
+    const uid = req.user!.uid;
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      throw new AppError('Access token is required', 400);
+    }
+
+    await firestore.collection('users').doc(uid).update({
+      calendar_access_token: accessToken,
+      calendar_connected: true,
+      updated_at: FieldValue.serverTimestamp()
+    });
+
+    logger.info(`✅ Calendar token stored for user: ${uid}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Calendar connected successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+static async syncCalendarAvailability(req: Request, res: Response, next: NextFunction) {
+  try {
+    const uid = req.user!.uid;
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      throw new AppError('Google Calendar access token is required', 400);
+    }
+
+    // Get user's current manual availability preferences
+    const userDoc = await firestore.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      throw new AppError('User not found', 404);
+    }
+
+    const userData = userDoc.data()!;
+    
+    // Ensure availability structure exists with proper defaults
+    let userAvailability = userData.availability;
+    
+    if (!userAvailability || typeof userAvailability !== 'object') {
+      userAvailability = { days: [], times: [] };
+      console.log(`⚠️ User ${uid} has no manual availability set, using defaults`);
+    } else {
+      // Ensure days and times arrays exist
+      if (!userAvailability.days || !Array.isArray(userAvailability.days)) {
+        userAvailability.days = [];
+      }
+      if (!userAvailability.times || !Array.isArray(userAvailability.times)) {
+        userAvailability.times = [];
+      }
+    }
+
+    console.log(`📋 User ${uid} manual availability:`, userAvailability);
+
+    const busyTimes = await CalendarService.getUserAvailability(accessToken);
+    
+    // 🔥 UPDATED: Pass uid to consider booked sessions
+    const availableSlots = await CalendarService.generateAvailableSlots(busyTimes, userAvailability, uid);
+    
+    await firestore.collection('users').doc(uid).update({
+      calendar_synced: true,
+      calendar_busy_times: busyTimes,
+      available_slots: availableSlots,
+      calendar_last_sync: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp()
+    });
+
+    logger.info(`✅ Calendar synced for user: ${uid}, generated ${availableSlots.length} available slots`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Calendar availability synced successfully',
+      data: {
+        available_slots: availableSlots,
+        busy_times_count: busyTimes.length,
+        user_manual_availability: userAvailability,
+        slots_generated: availableSlots.length
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// 🔥 NEW: Enhanced session booking method
+static async bookSession(req: Request, res: Response, next: NextFunction) {
+  try {
+    const uid = req.user!.uid;
+    const { accessToken, summary, startTime, endTime, attendeeEmail, participantUid, skillTopic, sessionType, description } = req.body;
+
+    if (!accessToken || !summary || !startTime || !endTime || !attendeeEmail || !participantUid || !skillTopic) {
+      throw new AppError('Missing required fields: accessToken, summary, startTime, endTime, attendeeEmail, participantUid, skillTopic', 400);
+    }
+
+    // Validate time format
+    const startDateTime = new Date(startTime);
+    const endDateTime = new Date(endTime);
+    
+    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+      throw new AppError('Invalid date format. Use ISO format like: 2025-06-12T10:00:00+05:30', 400);
+    }
+
+    if (startDateTime >= endDateTime) {
+      throw new AppError('Start time must be before end time', 400);
+    }
+
+    // 🔥 NEW: Book session in our database first
+    const sessionId = await SessionBookingService.bookSession({
+      organizerUid: uid,
+      participantUid,
+      startTime,
+      endTime,
+      skillTopic,
+      sessionType: sessionType || 'learning'
+    });
+
+    // Create calendar event
+    const event = await CalendarService.createSessionEvent(accessToken, {
+      summary,
+      startTime,
+      endTime,
+      attendeeEmail,
+      description: description || `SkillSwap Session: ${skillTopic}`
+    });
+
+    // 🔥 NEW: Update session with Google Calendar event ID
+    await firestore.collection('sessions').doc(sessionId).update({
+      google_event_id: event.id,
+      google_event_link: event.htmlLink,
+      hangout_link: event.hangoutLink || null,
+      updated_at: FieldValue.serverTimestamp()
+    });
+
+    logger.info(`✅ Session booked for user ${uid} with event ID: ${event.id}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Session booked and added to calendar',
+      data: {
+        sessionId: sessionId,
+        eventId: event.id,
+        eventLink: event.htmlLink,
+        hangoutLink: event.hangoutLink || null,
+        summary: event.summary,
+        startTime: event.start?.dateTime,
+        endTime: event.end?.dateTime,
+        attendeeEmail: attendeeEmail,
+        skillTopic: skillTopic
+      }
+    });
+  } catch (error) {
+    logger.error(`❌ Failed to book session for user:`, error);
+    next(error);
+  }
+}
+
+static async rateSession(req: Request, res: Response, next: NextFunction) {
+  try {
+    const raterUid = req.user!.uid;
+    const { sessionId, mentorUid, rating } = req.body;
+
+    if (!sessionId || !mentorUid || !rating) {
+      throw new AppError('Session ID, mentor UID, and rating are required', 400);
+    }
+
+    if (rating < 1 || rating > 5) {
+      throw new AppError('Rating must be between 1 and 5', 400);
+    }
+
+    await SessionRatingService.rateSession(sessionId, raterUid, mentorUid, rating);
+
+    const mentorDoc = await firestore.collection('users').doc(mentorUid).get();
+    const mentorData = mentorDoc.data()!;
+
+    logger.info(`✅ Session rated by ${raterUid}: ${rating}/5 for mentor ${mentorUid}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Session rated successfully',
+      data: {
+        mentor_new_badge_score: mentorData.badge_score,
+        mentor_total_ratings: mentorData.badge_count
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// static async bookSession(req: Request, res: Response, next: NextFunction) {
+//   try {
+//     const uid = req.user!.uid;
+//     const { accessToken, summary, startTime, endTime, attendeeEmail, description } = req.body;
+
+//     // Validation
+//     if (!accessToken || !summary || !startTime || !endTime || !attendeeEmail) {
+//       throw new AppError('Missing required fields: accessToken, summary, startTime, endTime, attendeeEmail', 400);
+//     }
+
+//     // Validate time format
+//     const startDateTime = new Date(startTime);
+//     const endDateTime = new Date(endTime);
+    
+//     if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+//       throw new AppError('Invalid date format. Use ISO format like: 2025-06-12T10:00:00+05:30', 400);
+//     }
+
+//     if (startDateTime >= endDateTime) {
+//       throw new AppError('Start time must be before end time', 400);
+//     }
+
+//     // Create calendar event
+//     const event = await CalendarService.createSessionEvent(accessToken, {
+//       summary,
+//       startTime,
+//       endTime,
+//       attendeeEmail,
+//       description: description || 'SkillSwap Learning Session'
+//     });
+
+//     // Store session record in Firestore
+//     const sessionRef = firestore.collection('sessions').doc();
+//     await sessionRef.set({
+//       id: sessionRef.id,
+//       organizer_uid: uid,
+//       attendee_email: attendeeEmail,
+//       summary,
+//       start_time: startDateTime,
+//       end_time: endDateTime,
+//       google_event_id: event.id,
+//       google_event_link: event.htmlLink,
+//       hangout_link: event.hangoutLink || null,
+//       status: 'scheduled',
+//       created_at: FieldValue.serverTimestamp()
+//     });
+
+//     logger.info(`✅ Session booked for user ${uid} with event ID: ${event.id}`);
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Session booked and added to calendar',
+//       data: {
+//         sessionId: sessionRef.id,
+//         eventId: event.id,
+//         eventLink: event.htmlLink,
+//         hangoutLink: event.hangoutLink || null,
+//         summary: event.summary,
+//         startTime: event.start?.dateTime,
+//         endTime: event.end?.dateTime,
+//         attendeeEmail: attendeeEmail
+//       }
+//     });
+//   } catch (error) {
+//     logger.error(`❌ Failed to book session for user:`, error);
+//     next(error);
+//   }
+// }
+
 }
